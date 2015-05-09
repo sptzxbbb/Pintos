@@ -191,6 +191,26 @@ thread_sleep(int64_t ticks)
     intr_set_level (old_level);
 }
 
+void
+thread_accquire_lock (struct lock * l)
+{
+    struct thread *cur = thread_current();
+    list_push_back(&cur->occuied_locks_list, &l->elem);
+}
+
+void
+thread_release_lock (struct lock* l)
+{
+    struct thread* lock_holder = l->holder;
+    thread_update_priority (lock_holder);
+    list_remove (&l->elem);
+}
+
+void
+thread_update_priority(struct thread* lock_holder)
+{
+    
+}
 
 bool
 thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem * b, void *aux)
@@ -202,9 +222,7 @@ thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem * b, void *aux)
     struct thread *B = list_entry(b, struct thread, elem);
 
     return A->wakeup_ticks < B->wakeup_ticks;
-
 }
-
 
 /* Prints thread statistics. */
 void
@@ -275,7 +293,10 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  if (thread_current ()->priority <= priority)
+  {
+  thread_yield();
+  }
   return tid;
 }
 
@@ -404,9 +425,14 @@ thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int new_priority)
 {
-  thread_current ()->priority = new_priority;
+    thread_current ()->priority = new_priority;
+    if (!list_empty (&ready_list)) {
+        struct thread *head = list_entry(list_front(&ready_list), struct thread, elem);
+        if (head->priority >= new_priority)
+        thread_yield ();
+    }
 }
 
 /* Returns the current thread's priority. */

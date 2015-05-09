@@ -81,13 +81,14 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 struct thread
-  {
+{
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+;
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -101,7 +102,19 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-      int64_t wakeup_ticks;
+    /* The time when thread is supposed to be unblocked */
+    int64_t wakeup_ticks;
+    /* The priority in the first place */
+    int pristine_priority;
+    /* The lock that it is waiting for */
+    struct lock *required_lock;
+    /* The locks that it possessed */
+    struct list occupied_locks_list;
+    /* Record the threads that donated priority to this thread */
+    struct list thread_donate_list;
+    /* List element for thread_donate_list */
+    struct list_elem donate_elem;
+
   };
 
 /* If false (default), use round-robin scheduler.
@@ -145,5 +158,7 @@ void thread_wakeup (void);
 void thread_sleep (int64_t ticks);
 bool thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux);
 bool thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem *b, void *UNUSED);
-
+void thread_accquire_lock (struct lock* l);
+void thread_release_lock (struct lock* l);
+void thread_update_priority (struct lock* l);
 #endif /* threads/thread.h */

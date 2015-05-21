@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -146,27 +147,64 @@ thread_tick (void)
 }
 
 void
-thread_wakeup(struct thread* t, void *aux UNUSED)
+thread_wakeup(void)
 {
-    if (THREAD_BLOCKED == t->status && 0 < t->wakeup_ticks)
+  struct list_elem *cur; // Current element in the list
+  struct list_elem *next; // Next element connected to the current one
+  struct thread *t;
+  enum intr_level old_level;
+
+  if (list_empty (&sleep_list))
+    return;
+
+  cur = list_begin (&sleep_list);
+  while (cur != list_end (&sleep_list))
     {
-        --t->wakeup_ticks;
-        if (0 == t->wakeup_ticks)
-        {
-            list_remove(&t->elem);
-            thread_unblock(t);
-        }
+        next = list_next (cur);
+        t = list_entry (cur, struct thread, elem);
+        if (t->wakeup_ticks > timer_ticks())
+        break;
+
+        old_level = intr_disable ();
+        list_remove(cur);
+        thread_unblock(t);
+        intr_set_level (old_level);
+
+        cur = next;
     }
 }
+
 
 void
 thread_sleep(int64_t ticks)
 {
+
+    enum intr_level old_level;
     struct thread* cur = thread_current();
-    cur->wakeup_ticks = ticks;
-    list_push_back(&sleep_list, &cur->elem);
+
+    ASSERT(THREAD_RUNNING == cur->status);
+
+    old_level = intr_disable ();
+    cur->wakeup_ticks = ticks + timer_ticks ();
+    list_insert_ordered (&sleep_list, &cur->elem, thread_cmp_wakeup_ticks, NULL);
     thread_block ();
+    intr_set_level (old_level);
 }
+
+
+bool
+thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem * b, void *aux)
+{
+    ASSERT (a != NULL);
+    ASSERT (b != NULL);
+
+    struct thread *A = list_entry(a, struct thread, elem);
+    struct thread *B = list_entry(b, struct thread, elem);
+
+    return A->wakeup_ticks < B->wakeup_ticks;
+
+}
+
 
 /* Prints thread statistics. */
 void
@@ -275,7 +313,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 //  list_push_back (&ready_list, &t->elem);
-  list_insert_ordered(&ready_list, &t->elem, &thread_cmp_priority, 0);
+  list_insert_ordered(&ready_list, &t->elem, thread_cmp_priority, 0);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -347,59 +385,21 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread)
 //  list_push_back (&ready_list, &cur->elem);
-  list_insert_ordered(&ready_list, &cur->elem, &thread_cmp_priority, 0);
+  list_insert_ordered(&ready_list, &cur->elem, thread_cmp_priority, 0);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
 }
 
-/* Invoke function 'func' on all threads, passing along 'aux'.
-   This function must be called with interrupts off. */
-void
-thread_foreach (thread_action_func *func, void *aux)
-{
-  struct list_elem *e;
-
-  ASSERT (intr_get_level () == INTR_OFF);
-
-  for (e = list_begin (&all_list); e != list_end (&all_list);
-       e = list_next (e))
-    {
-      struct thread *t = list_entry (e, struct thread, allelem);
-      func (t, aux);
-    }
-}
-
-
-
-
-/* Invoke function 'func' on all threads, passing along 'aux'.
-   This function must be called with interrupts off. */
-void
-thread_forsleep (thread_action_func *func, void *aux)
-{
-  struct list_elem *e;
-
-  ASSERT (intr_get_level () == INTR_OFF);
-
-  for (e = list_begin (&sleep_list); e != list_end (&sleep_list);
-       e = list_next (e))
-    {
-      struct thread *t = list_entry (e, struct thread, allelem);
-      func (t, aux);
-    }
-}
-
 bool
-thread_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux)
 {
+    ASSERT (a != NULL && b != NULL);
+
     struct thread *A = list_entry(a, struct thread, elem);
     struct thread *B = list_entry(b, struct thread, elem);
-    if (A->priority > B->priority)
-    {
-        return true;
-    }
-    return false;
+
+    return A->priority > B->priority;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -425,7 +425,7 @@ thread_set_nice (int nice UNUSED)
 
 /* Returns the current thread's nice value. */
 int
-threapppd_get_nice (void) 
+thread_get_nice (void) 
 {
   /* Not yet implemented. */
   return 0;
@@ -485,6 +485,25 @@ idle (void *idle_started_ UNUSED)
     }
 }
 
+
+/* Invoke function 'func' on all threads, passing along 'aux'.
+   This function must be called with interrupts off. */
+void
+thread_foreach (thread_action_func *func, void *aux)
+{
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      func (t, aux);
+    }
+}
+
+
 /* Function used as the basis for a kernel thread. */
 static void
 kernel_thread (thread_func *function, void *aux) 
@@ -534,7 +553,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
-  //list_insert_ordered (&all_list, &t->allelem, &thread_cmp_priority, 0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

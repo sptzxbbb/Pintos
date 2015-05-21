@@ -128,11 +128,9 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
-void thread_wakeup (struct thread *t, void *aux UNUSED);
-
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
-void thread_foreach (thread_action_func *, void *);
+void thread_foreach (thread_action_func *t, void *aux);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
@@ -143,8 +141,9 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 
-void thread_forsleep (thread_action_func *func, void *aux);
+void thread_wakeup (void);
 void thread_sleep (int64_t ticks);
-bool thread_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux);
+bool thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem *b, void *UNUSED);
 
 #endif /* threads/thread.h */

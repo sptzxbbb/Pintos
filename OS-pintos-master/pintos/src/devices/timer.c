@@ -92,11 +92,17 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+  int64_t start = timer_ticks ();
+
   ASSERT (intr_get_level () == INTR_ON);
+  /* while (timer_elapsed (start) < ticks)
+     thread_yield ();
+  */
+  
   /* ##> Our implementation
    * Put current thread to sleep for a fixed ticks */
   thread_sleep(ticks);
-
+  /* <##*/
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -195,7 +201,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       cur = thread_current ();
       if (cur->status == THREAD_RUNNING)
         {
-          cur->recent_cpu = ADD_INT (cur->recepnt_cpu, 1);
+          cur->recent_cpu = ADD_INT (cur->recent_cpu, 1);
         }
       if (ticks % TIMER_FREQ == 0)
         {

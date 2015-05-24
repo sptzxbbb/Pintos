@@ -224,6 +224,11 @@ void thread_update_priority (struct thread* t)
         }
     }
 
+    if (t->status == THREAD_READY)
+    {
+        list_sort (&ready_list, thread_cmp_priority, NULL);
+    }
+
     intr_set_level (old_level);
 }
 
@@ -236,6 +241,11 @@ void thread_get_lock (struct lock *lock)
     lock->holder = cur;
     lock->lock_priority = cur->priority;
     list_insert_ordered(&cur->locks_holding_list, &lock->elem_lock, lock_cmp_priority, NULL);
+    if (lock->lock_priority > cur->priority)
+    {
+        cur->priority = lock->lock_priority;
+        thread_yield ();
+    }
 }
 
 
@@ -446,10 +456,10 @@ thread_set_priority (int new_priority)
     old_level = intr_disable ();
 
     struct thread* cur = thread_current ();
-    if (new_priority > cur->priority || cur->priority == cur->pristine_priority)
+    cur->pristine_priority = new_priority;
+    if (new_priority > cur->priority || list_empty (&cur->locks_holding_list))
     {
         cur->priority = new_priority;
-        cur->pristine_priority = new_priority;
         thread_yield ();
     }
     intr_set_level (old_level);

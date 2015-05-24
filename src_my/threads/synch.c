@@ -115,10 +115,12 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
+      list_sort (&sema->waiters, thread_cmp_priority, NULL);
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   }
   sema->value++;
+  thread_yield ();
   intr_set_level (old_level);
 }
 
@@ -203,7 +205,7 @@ lock_acquire (struct lock *lock)
 
   struct thread* cur = thread_current ();
 
-  if (lock->holder != NULL) {
+  if (lock->holder != NULL && !thread_mlfqs) {
       cur->blocked_by_lock = lock;
 
       struct lock* l = lock;
@@ -218,7 +220,6 @@ lock_acquire (struct lock *lock)
 
   sema_down (&lock->semaphore);
 
-  lock->holder = cur;
   if (!thread_mlfqs)
   {
       thread_get_lock (lock);
@@ -266,6 +267,7 @@ lock_release (struct lock *lock)
         list_remove (&lock->elem_lock);
         // update the owner's priority after releasing this lock
         thread_update_priority (thread_current ());
+
     }
 
     lock->holder = NULL;
@@ -372,9 +374,23 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
+  if (!list_empty (&cond->waiters))
+  {
+      list_sort (&cond->waiters, cond_cmp_priority, NULL);
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
+  }
+}
+
+bool
+cond_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux) {
+    ASSERT (a != NULL && b != NULL);
+
+    struct semaphore_elem *A = list_entry(a, struct semaphore_elem, elem);
+    struct semaphore_elem *B = list_entry(b, struct semaphore_elem, elem);
+    struct thread *A_ = list_entry (list_front(&A->semaphore.waiters), struct thread, elem);
+    struct thread *B_ = list_entry (list_front(&B->semaphore.waiters), struct thread, elem);
+    return A_->priority > B_->priority;
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

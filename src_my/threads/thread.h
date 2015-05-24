@@ -107,13 +107,9 @@ struct thread
     /* The priority in the first place */
     int pristine_priority;
     /* The lock that it is waiting for */
-    struct lock *required_lock;
-    /* The locks that it possessed */
-    struct list occupied_locks_list;
-    /* Record the threads that donated priority to this thread */
-    struct list thread_donate_list;
-    /* List element for thread_donate_list */
-    struct list_elem donate_elem;
+    struct lock *blocked_by_lock;
+    /* The locks that this thread holds */
+    struct list locks_holding_list;
 
   };
 
@@ -158,7 +154,7 @@ void thread_wakeup (void);
 void thread_sleep (int64_t ticks);
 bool thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux);
 bool thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem *b, void *UNUSED);
-void thread_accquire_lock (struct lock* l);
-void thread_release_lock (struct lock* l);
-void thread_update_priority (struct lock* l);
+void thread_update_priority (struct thread* t);
+void thread_get_lock (struct lock *t);
+
 #endif /* threads/thread.h */

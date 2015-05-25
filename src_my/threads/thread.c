@@ -241,11 +241,6 @@ void thread_get_lock (struct lock *lock)
     lock->holder = cur;
     lock->lock_priority = cur->priority;
     list_insert_ordered(&cur->locks_holding_list, &lock->elem_lock, lock_cmp_priority, NULL);
-    if (lock->lock_priority > cur->priority)
-    {
-        cur->priority = lock->lock_priority;
-        thread_yield ();
-    }
 }
 
 

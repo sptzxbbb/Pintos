@@ -260,7 +260,6 @@ lock_release (struct lock *lock)
     enum intr_level old_level;
     old_level = intr_disable ();
 
-
     if (!thread_mlfqs)
     {
         // remove the lock from locks_holding_list;
@@ -269,7 +268,6 @@ lock_release (struct lock *lock)
         thread_update_priority (thread_current ());
 
     }
-
     lock->holder = NULL;
     sema_up (&lock->semaphore);
 
@@ -286,15 +284,13 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
   };
-
-
 
 bool
 lock_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux)
@@ -306,9 +302,6 @@ lock_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux)
 
     return A->lock_priority > B->lock_priority;
 }
-
-
-
 
 
 /* Initializes condition variable COND.  A condition variable

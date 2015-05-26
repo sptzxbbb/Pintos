@@ -12,14 +12,20 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "devices/timer.h"
+#include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+
+/* load_avg estimates the average number of threads ready to run over the past minute.  */
+static fixed_t load_avg;
+
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -119,7 +125,7 @@ thread_start (void)
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
-
+  load_avg = CONVERT_TO_FP(0);
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
@@ -469,17 +475,20 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice)
 {
-  /* Not yet implemented. */
+    struct thread* cur;
+    cur = thread_current ();
+    cur->nice = nice;
+
+    calculate_priority (cur, NULL);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+    return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -487,7 +496,7 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+    return CONVERT_TO_INT_NEAREST (MUL_INT (load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -495,7 +504,7 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+    return 0;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -608,6 +617,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->pristine_priority = priority;
   list_init (&t->locks_holding_list);
   t->blocked_by_lock = NULL;
+  t->nice = 0;
+  t->recent_cpu = CONVERT_TO_FP (0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -676,7 +687,7 @@ thread_schedule_tail (struct thread *prev)
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
-  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
+  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread)
     {
       ASSERT (prev != cur);
       palloc_free_page (prev);
@@ -723,3 +734,33 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+void
+calculate_load_avg (void)
+{
+    int ready_threads = list_size (&ready_list);
+    if (thread_current () != idle_thread)
+    {
+        ++ready_threads;
+    }
+    load_avg = MUL(DIV_INT(CONVERT_TO_FP(59), 60), load_avg) + DIV_INT(CONVERT_TO_FP(ready_threads), 60);
+}
+
+void
+calculate_priority (struct thread* cur, void* aux)
+{
+    ASSERT (is_thread (cur));
+    if (cur != idle_thread)
+    {
+        cur->priority = PRI_MAX - CONVERT_TO_INT_NEAREST (DIV_INT (cur->recent_cpu, 4)) - cur->nice * 2;
+    }
+    if (cur->priority < PRI_MIN)
+    {
+        cur->priority = PRI_MIN;
+    }
+    if (cur->priority > PRI_MAX)
+    {
+        cur->priority = PRI_MAX;
+    }
+}

@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "threads/fixed_point.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -111,6 +111,8 @@ struct thread
     /* The locks that this thread holds */
     struct list locks_holding_list;
 
+    fixed_t recent_cpu;
+    int nice;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -157,4 +159,7 @@ bool thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem *b, void *UN
 void thread_update_priority (struct thread* t);
 void thread_get_lock (struct lock *t);
 
+void thread_mlfqs_update_load_avg_and_recent_cpu (void);
+void calculate_load_avg (void);
+void calculate_priority (struct thread* cur, void *aux);
 #endif /* threads/thread.h */

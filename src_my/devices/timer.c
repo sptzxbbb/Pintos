@@ -174,6 +174,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
 //  thread_foreach (thread_wakeup, 0);
   thread_wakeup();
   thread_tick ();
+  if (thread_mlfqs)
+  {
+
+      if (0 == ticks % TIMER_FREQ)
+      {
+          calculate_load_avg ();
+      }
+
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -246,3 +255,5 @@ real_time_delay (int64_t num, int32_t denom)
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
+
+

@@ -205,25 +205,23 @@ lock_acquire (struct lock *lock)
 
   struct thread* cur = thread_current ();
 
-  if (lock->holder != NULL && !thread_mlfqs) {
+  if (lock->holder != NULL) {
       cur->blocked_by_lock = lock;
-
-      struct lock* l = lock;
-      // nested donation
-      while (l != NULL && cur->priority > l->lock_priority)
+      if (!thread_mlfqs)
       {
-          l->lock_priority = cur->priority;
-          thread_update_priority (l->holder);
-          l = l->holder->blocked_by_lock;
+          struct lock* l = lock;
+          // nested donation
+          while (l != NULL && cur->priority > l->lock_priority)
+          {
+              l->lock_priority = cur->priority;
+              thread_update_priority (l->holder);
+              l = l->holder->blocked_by_lock;
+          }
       }
   }
 
   sema_down (&lock->semaphore);
-
-  if (!thread_mlfqs)
-  {
-      thread_get_lock (lock);
-  }
+  thread_get_lock (lock);
   intr_set_level (old_level);
 }
 
@@ -253,21 +251,18 @@ lock_try_acquire (struct lock *lock)
    make sense to try to release a lock within an interrupt
    handler. */
 void
-lock_release (struct lock *lock) 
+lock_release (struct lock *lock)
 {
     ASSERT (lock != NULL);
     ASSERT (lock_held_by_current_thread (lock));
     enum intr_level old_level;
     old_level = intr_disable ();
 
-    if (!thread_mlfqs)
-    {
-        // remove the lock from locks_holding_list;
-        list_remove (&lock->elem_lock);
-        // update the owner's priority after releasing this lock
-        thread_update_priority (thread_current ());
+    // remove the lock from locks_holding_list;
+    list_remove (&lock->elem_lock);
+    // update the owner's priority after releasing this lock
+    thread_update_priority (thread_current ());
 
-    }
     lock->holder = NULL;
     sema_up (&lock->semaphore);
 
@@ -286,7 +281,7 @@ lock_held_by_current_thread (const struct lock *lock)
 }
 
 /* One semaphore in a list. */
-struct semaphore_elem 
+struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */

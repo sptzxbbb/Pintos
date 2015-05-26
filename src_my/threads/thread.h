@@ -162,4 +162,8 @@ void thread_get_lock (struct lock *t);
 void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 void calculate_load_avg (void);
 void calculate_priority (struct thread* cur, void *aux);
+void calculate_priority_foreach (void);
+void calculate_recent_cpu (struct thread* cur, void *aux);
+void calculate_recent_cpu_foreach (void);
+void incremented_recent_cpu (void);
 #endif /* threads/thread.h */

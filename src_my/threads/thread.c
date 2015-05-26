@@ -482,6 +482,7 @@ thread_set_nice (int nice)
     cur->nice = nice;
 
     calculate_priority (cur, NULL);
+    thread_yield ();
 }
 
 /* Returns the current thread's nice value. */
@@ -495,7 +496,6 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
     return CONVERT_TO_INT_NEAREST (MUL_INT (load_avg, 100));
 }
 
@@ -503,8 +503,8 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-    return 0;
+    struct thread *cur = thread_current ();
+    return CONVERT_TO_INT_NEAREST (MUL_INT (cur->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -739,12 +739,14 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 void
 calculate_load_avg (void)
 {
+    struct thread *cur = thread_current ();
     int ready_threads = list_size (&ready_list);
-    if (thread_current () != idle_thread)
+
+    if (cur != idle_thread)
     {
         ++ready_threads;
     }
-    load_avg = MUL(DIV_INT(CONVERT_TO_FP(59), 60), load_avg) + DIV_INT(CONVERT_TO_FP(ready_threads), 60);
+    load_avg = MUL (DIV_INT (CONVERT_TO_FP (59), 60), load_avg) +  MUL_INT (DIV_INT (CONVERT_TO_FP (1), 60), ready_threads);
 }
 
 void
@@ -762,5 +764,41 @@ calculate_priority (struct thread* cur, void* aux)
     if (cur->priority > PRI_MAX)
     {
         cur->priority = PRI_MAX;
+    }
+}
+
+void
+calculate_priority_foreach (void)
+{
+    thread_foreach (calculate_priority, NULL);
+}
+
+void calculate_recent_cpu (struct thread* cur, void *aux)
+{
+    if (cur != idle_thread)
+    {
+        int load = MUL_INT (load_avg, 2);
+        fixed_t coef = DIV (load, ADD_INT (load, 1));
+        cur->recent_cpu = ADD_INT (MUL (coef, cur->recent_cpu), cur->nice);
+    }
+}
+
+void
+calculate_recent_cpu_foreach (void)
+{
+    thread_foreach (calculate_recent_cpu, NULL);
+    if (!list_empty (&ready_list))
+    {
+        list_sort (&ready_list, thread_cmp_priority, NULL);
+    }
+}
+
+void
+incremented_recent_cpu (void)
+{
+    struct thread *cur = thread_current ();
+    if (cur != idle_thread)
+    {
+        cur->recent_cpu = ADD_INT (cur->recent_cpu, 1);
     }
 }

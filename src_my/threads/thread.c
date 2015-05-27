@@ -746,7 +746,8 @@ calculate_load_avg (void)
     {
         ++ready_threads;
     }
-    load_avg = MUL (DIV_INT (CONVERT_TO_FP (59), 60), load_avg) +  MUL_INT (DIV_INT (CONVERT_TO_FP (1), 60), ready_threads);
+    load_avg = MUL (DIV_INT (CONVERT_TO_FP (59), 60), load_avg) +
+        MUL_INT (DIV_INT (CONVERT_TO_FP (1), 60), ready_threads);
 }
 
 void
@@ -755,13 +756,15 @@ calculate_priority (struct thread* cur, void* aux)
     ASSERT (is_thread (cur));
     if (cur != idle_thread)
     {
-        cur->priority = PRI_MAX - CONVERT_TO_INT_NEAREST (DIV_INT (cur->recent_cpu, 4)) - cur->nice * 2;
+        cur->priority = PRI_MAX -
+            CONVERT_TO_INT_NEAREST (DIV_INT (cur->recent_cpu, 4)) -
+            cur->nice * 2;
     }
     if (cur->priority < PRI_MIN)
     {
         cur->priority = PRI_MIN;
     }
-    if (cur->priority > PRI_MAX)
+    else if (cur->priority > PRI_MAX)
     {
         cur->priority = PRI_MAX;
     }
@@ -771,10 +774,15 @@ void
 calculate_priority_foreach (void)
 {
     thread_foreach (calculate_priority, NULL);
+    if (!list_empty (&ready_list))
+    {
+        list_sort (&ready_list, thread_cmp_priority, NULL);
+    }
 }
 
 void calculate_recent_cpu (struct thread* cur, void *aux)
 {
+    ASSERT (is_thread (cur));
     if (cur != idle_thread)
     {
         int load = MUL_INT (load_avg, 2);
@@ -787,10 +795,6 @@ void
 calculate_recent_cpu_foreach (void)
 {
     thread_foreach (calculate_recent_cpu, NULL);
-    if (!list_empty (&ready_list))
-    {
-        list_sort (&ready_list, thread_cmp_priority, NULL);
-    }
 }
 
 void

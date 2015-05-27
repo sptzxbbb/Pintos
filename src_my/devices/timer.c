@@ -171,7 +171,6 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-//  thread_foreach (thread_wakeup, 0);
   thread_wakeup();
   thread_tick ();
   if (thread_mlfqs)
@@ -227,8 +226,8 @@ static void
 real_time_sleep (int64_t num, int32_t denom) 
 {
   /* Convert NUM/DENOM seconds into timer ticks, rounding down.
-          
-        (NUM / DENOM) s          
+
+        (NUM / DENOM) s
      ---------------------- = NUM * TIMER_FREQ / DENOM ticks. 
      1 s / TIMER_FREQ ticks
   */
@@ -239,7 +238,7 @@ real_time_sleep (int64_t num, int32_t denom)
     {
       /* We're waiting for at least one full timer tick.  Use
          timer_sleep() because it will yield the CPU to other
-         processes. */                
+         processes. */
       timer_sleep (ticks); 
     }
   else 

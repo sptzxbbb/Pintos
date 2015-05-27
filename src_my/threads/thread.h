@@ -110,8 +110,9 @@ struct thread
     struct lock *blocked_by_lock;
     /* The locks that this thread holds */
     struct list locks_holding_list;
-
+    /* the cpu time that thread reveived recently */
     fixed_t recent_cpu;
+    /* a parameter used to set priority */
     int nice;
   };
 

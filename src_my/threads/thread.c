@@ -152,6 +152,8 @@ thread_tick (void)
     intr_yield_on_return ();
 }
 
+
+/* check all the sleeping thread which should wakeup */
 void
 thread_wakeup(void)
 {
@@ -180,7 +182,7 @@ thread_wakeup(void)
     }
 }
 
-
+/* sleep the current thread for ticks */
 void
 thread_sleep(int64_t ticks)
 {
@@ -198,6 +200,7 @@ thread_sleep(int64_t ticks)
 }
 
 
+/* compare two thread' wakeup_ticks */
 bool
 thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem * b, void *aux)
 {
@@ -482,7 +485,14 @@ thread_set_nice (int nice)
     cur->nice = nice;
 
     calculate_priority (cur, NULL);
-    thread_yield ();
+
+  if (cur != idle_thread)
+  {
+      if (list_entry (list_begin (&ready_list), struct thread, elem)->priority > cur->priority)
+      {
+          thread_yield ();
+      }
+  }
 }
 
 /* Returns the current thread's nice value. */
@@ -668,7 +678,7 @@ void
 thread_schedule_tail (struct thread *prev)
 {
   struct thread *cur = running_thread ();
-  
+
   ASSERT (intr_get_level () == INTR_OFF);
 
   /* Mark us as running. */
@@ -735,7 +745,7 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-
+/* recalculate the load_avg */
 void
 calculate_load_avg (void)
 {
@@ -750,6 +760,7 @@ calculate_load_avg (void)
         MUL_INT (DIV_INT (CONVERT_TO_FP (1), 60), ready_threads);
 }
 
+/* recalculate the priority of the given thread */
 void
 calculate_priority (struct thread* cur, void* aux)
 {
@@ -770,6 +781,7 @@ calculate_priority (struct thread* cur, void* aux)
     }
 }
 
+/* calculate all the threads' priority */
 void
 calculate_priority_foreach (void)
 {
@@ -780,6 +792,7 @@ calculate_priority_foreach (void)
     }
 }
 
+/* calculate the recent_cpu of given thread */
 void calculate_recent_cpu (struct thread* cur, void *aux)
 {
     ASSERT (is_thread (cur));
@@ -791,12 +804,14 @@ void calculate_recent_cpu (struct thread* cur, void *aux)
     }
 }
 
+/* calculate the recent_cpu of all threads */
 void
 calculate_recent_cpu_foreach (void)
 {
     thread_foreach (calculate_recent_cpu, NULL);
 }
 
+/* add 1 to the current thread's recent_cpu*/
 void
 incremented_recent_cpu (void)
 {

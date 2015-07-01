@@ -60,6 +60,7 @@ Project 1 Pass!
 $ make check
 ~~~
 
+~~~
 pass tests/threads/alarm-single
 pass tests/threads/alarm-multiple
 pass tests/threads/alarm-simultaneous
@@ -88,3 +89,4 @@ pass tests/threads/mlfqs-nice-2
 pass tests/threads/mlfqs-nice-10
 pass tests/threads/mlfqs-block
 All 27 tests passed.
+~~~

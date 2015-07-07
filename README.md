@@ -9,7 +9,7 @@ To see more details about my project, please click [My Blog](http://www.sptzxb.c
 ### Project 1 ###
 
 Sun May 17 10:17:19 2015  
-Analyze the subfunction timer_sleep() call.  
+Analyze the subroutine timer_sleep() call.  
 Study the process scheduling algorithm, that is, simple FCFS.  
 Study page management using bitmap.
 
@@ -104,3 +104,10 @@ pass tests/threads/mlfqs-nice-10
 pass tests/threads/mlfqs-block
 All 27 tests passed.
 ~~~
+
+
+### Project2 ###
+
+Read the document about Pintos' file system.
+
+

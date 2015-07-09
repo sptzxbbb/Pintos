@@ -114,3 +114,7 @@ Fixed an mysterious bug project1 resulted in.
 
 Fri Jul 10 08:08:18 2015  
 Working on argument passing.  
+
+Sun Jul 12 16:11:55 2015
+Finish code session about argument passing.
+Have a good grasp of framework for project2.

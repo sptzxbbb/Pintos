@@ -108,7 +108,9 @@ All 27 tests passed.
 
 ### Project2 ###
 
-Wed Jul  8 22:00:17 2015
-Read the document about Pintos' file system.
-Fixed an mysterious bug project1 resulted in.
+Wed Jul  8 22:00:17 2015  
+Read the document about Pintos' file system.  
+Fixed an mysterious bug project1 resulted in.  
 
+Fri Jul 10 08:08:18 2015  
+Working on argument passing.  

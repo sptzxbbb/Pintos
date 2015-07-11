@@ -588,7 +588,7 @@ __printf (const char *format,
    arranged 16 per line.  Numeric offsets are also included,
    starting at OFS for the first byte in BUF.  If ASCII is true
    then the corresponding ASCII characters are also rendered
-   alongside. */   
+   alongside. */
 void
 hex_dump (uintptr_t ofs, const void *buf_, size_t size, bool ascii)
 {

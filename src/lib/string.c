@@ -232,10 +232,10 @@ strstr (const char *haystack, const char *needle)
      'tokenize.'
 */
 char *
-strtok_r (char *s, const char *delimiters, char **save_ptr) 
+strtok_r (char *s, const char *delimiters, char **save_ptr)
 {
   char *token;
-  
+
   ASSERT (delimiters != NULL);
   ASSERT (save_ptr != NULL);
 
@@ -246,7 +246,7 @@ strtok_r (char *s, const char *delimiters, char **save_ptr)
   ASSERT (s != NULL);
 
   /* Skip any DELIMITERS at our current position. */
-  while (strchr (delimiters, *s) != NULL) 
+  while (strchr (delimiters, *s) != NULL)
     {
       /* strchr() will always return nonnull if we're searching
          for a null byte, because every string contains a null
@@ -264,24 +264,24 @@ strtok_r (char *s, const char *delimiters, char **save_ptr)
   token = s;
   while (strchr (delimiters, *s) == NULL)
     s++;
-  if (*s != '\0') 
+  if (*s != '\0')
     {
       *s = '\0';
       *save_ptr = s + 1;
     }
-  else 
+  else
     *save_ptr = s;
   return token;
 }
 
 /* Sets the SIZE bytes in DST to VALUE. */
 void *
-memset (void *dst_, int value, size_t size) 
+memset (void *dst_, int value, size_t size)
 {
   unsigned char *dst = dst_;
 
   ASSERT (dst != NULL || size == 0);
-  
+
   while (size-- > 0)
     *dst++ = value;
 
@@ -290,7 +290,7 @@ memset (void *dst_, int value, size_t size)
 
 /* Returns the length of STRING. */
 size_t
-strlen (const char *string) 
+strlen (const char *string)
 {
   const char *p;
 
@@ -304,7 +304,7 @@ strlen (const char *string)
 /* If STRING is less than MAXLEN characters in length, returns
    its actual length.  Otherwise, returns MAXLEN. */
 size_t
-strnlen (const char *string, size_t maxlen) 
+strnlen (const char *string, size_t maxlen)
 {
   size_t length;
 

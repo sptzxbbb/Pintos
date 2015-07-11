@@ -38,10 +38,26 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char* fn_copy2;
+  /* Make a copy of FILE_NAME.
+     To extract the program name
+     Because strtok_r() need an modifiable string argument.
+  */
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy2 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy2, file_name, PGSIZE);
+  char *save;
+  char *pname = strtok_r(fn_copy2, " ", &save);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (pname, PRI_DEFAULT, start_process, fn_copy);
+
+
+  palloc_free_page(fn_copy2);
+
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
   return tid;
 }
 
@@ -217,16 +233,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL) 
+  if (t->pagedir == NULL)
     goto done;
   process_activate ();
 
   /* Open executable file. */
   file = filesys_open (file_name);
-  if (file == NULL) 
+  if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
-      goto done; 
+      goto done;
     }
 
   /* Read and verify executable header. */
@@ -302,10 +318,56 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+    if (!setup_stack (esp))
     goto done;
 
-  /* Start address. */
+    /*  Argument Passing is done here. */
+    int argc = 0;
+    void **argv[256];
+
+    /* Allocate a new page to manuipulate file name */
+    char *fn_copy;
+    fn_copy = palloc_get_page (0);
+    if (fn_copy == NULL)
+      return TID_ERROR;
+    strlcpy (fn_copy, file_name, PGSIZE);
+    /* Tokenize the command */
+    char* save_ptr;
+    char *arg = strtok_r(fn_copy, " ", &save_ptr);
+    while (arg != NULL) {
+        argv[argc] = arg;
+        ++argc;
+        arg = strtok_r(NULL, " ", &save_ptr);
+    }
+    /* Put the words into the stack */
+    int shift = 0;
+    for (i = argc; i >= 0; --i) {
+        shift += strlen((char*)argv[i]) + 1;
+        memcpy(*(esp - shift + 1), argv[i], strlen((char*)argv[i]) + 1);
+    }
+    palloc_free_page(fn_copy);
+    /* Word-align */
+    if (shift % 4 != 0) {
+        shift += 4;
+    }
+    shift = shift / 4 * 4;
+    /* argv[argc] is set to 0 */
+    argv[argc] = 0;
+    /* put the address of argv[i] into stack */
+    for (i = argc; i >= 0; --i) {
+        shift += sizeof(char*);
+        memcpy(*(esp - shift + 1), argv[i], sizeof(char*));
+    }
+    /* push argv and argc */
+    shift += sizeof(char**);
+    memcpy(*(esp - shift + 1), argv, sizeof(char**));
+    shift += sizeof(int);
+    memcpy(*(esp - shift + 1), &argc, sizeof(int));
+    /* push fake return address */
+    shift += sizeof(void*);
+    memcpy(*(esp - shift + 1), 0, sizeof(void(*)()));
+
+    /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
@@ -315,7 +377,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);

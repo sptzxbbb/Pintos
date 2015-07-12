@@ -39,22 +39,17 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   char* fn_copy2;
-  /* Make a copy of FILE_NAME.
-     To extract the program name
-     Because strtok_r() need an modifiable string argument.
-  */
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     return TID_ERROR;
   strlcpy (fn_copy2, file_name, PGSIZE);
-  char *save;
-  char *pname = strtok_r(fn_copy2, " ", &save);
+  char *args;
+  char *program_name = strtok_r(fn_copy2, " ", &args);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (pname, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (program_name, PRI_DEFAULT, start_process, fn_copy);
 
-
-  palloc_free_page(fn_copy2);
+  palloc_free_page (fn_copy2);
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
@@ -77,9 +72,12 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  palloc_free_page(0);
+
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
@@ -117,7 +115,7 @@ process_exit (void)
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
-  if (pd != NULL) 
+  if (pd != NULL)
     {
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
@@ -211,7 +209,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, const char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -222,7 +220,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -235,13 +233,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
     goto done;
+
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (t->name);
+
   if (file == NULL)
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", t->name);
       goto done;
     }
 
@@ -252,15 +252,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_machine != 3
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
-      || ehdr.e_phnum > 1024) 
+      || ehdr.e_phnum > 1024)
     {
-      printf ("load: %s: error loading executable\n", file_name);
-      goto done; 
+      printf ("load: %s: error loading executable\n", t->name);
+      goto done;
     }
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
-  for (i = 0; i < ehdr.e_phnum; i++) 
+  for (i = 0; i < ehdr.e_phnum; i++)
     {
       struct Elf32_Phdr phdr;
 
@@ -271,7 +271,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
         goto done;
       file_ofs += sizeof phdr;
-      switch (phdr.p_type) 
+      switch (phdr.p_type)
         {
         case PT_NULL:
         case PT_NOTE:
@@ -285,7 +285,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
         case PT_SHLIB:
           goto done;
         case PT_LOAD:
-          if (validate_segment (&phdr, file)) 
+          if (validate_segment (&phdr, file))
             {
               bool writable = (phdr.p_flags & PF_W) != 0;
               uint32_t file_page = phdr.p_offset & ~PGMASK;
@@ -300,7 +300,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
                   zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
                                 - read_bytes);
                 }
-              else 
+              else
                 {
                   /* Entirely zero.
                      Don't read anything from disk. */
@@ -318,54 +318,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-    if (!setup_stack (esp))
-    goto done;
-
-    /*  Argument Passing is done here. */
-    int argc = 0;
-    void **argv[256];
-
-    /* Allocate a new page to manuipulate file name */
-    char *fn_copy;
-    fn_copy = palloc_get_page (0);
-    if (fn_copy == NULL)
-      return TID_ERROR;
-    strlcpy (fn_copy, file_name, PGSIZE);
-    /* Tokenize the command */
-    char* save_ptr;
-    char *arg = strtok_r(fn_copy, " ", &save_ptr);
-    while (arg != NULL) {
-        argv[argc] = arg;
-        ++argc;
-        arg = strtok_r(NULL, " ", &save_ptr);
-    }
-    /* Put the words into the stack */
-    int shift = 0;
-    for (i = argc; i >= 0; --i) {
-        shift += strlen((char*)argv[i]) + 1;
-        memcpy(*(esp - shift + 1), argv[i], strlen((char*)argv[i]) + 1);
-    }
-    palloc_free_page(fn_copy);
-    /* Word-align */
-    if (shift % 4 != 0) {
-        shift += 4;
-    }
-    shift = shift / 4 * 4;
-    /* argv[argc] is set to 0 */
-    argv[argc] = 0;
-    /* put the address of argv[i] into stack */
-    for (i = argc; i >= 0; --i) {
-        shift += sizeof(char*);
-        memcpy(*(esp - shift + 1), argv[i], sizeof(char*));
-    }
-    /* push argv and argc */
-    shift += sizeof(char**);
-    memcpy(*(esp - shift + 1), argv, sizeof(char**));
-    shift += sizeof(int);
-    memcpy(*(esp - shift + 1), &argc, sizeof(int));
-    /* push fake return address */
-    shift += sizeof(void*);
-    memcpy(*(esp - shift + 1), 0, sizeof(void(*)()));
+  if (!setup_stack (esp, file_name))
+  goto done;
 
     /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -489,19 +443,68 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, const char* file_name)
 {
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
+  if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else
+      if (success) {
+        *esp = PHYS_BASE - 12;
+
+        /* Allocate a new page to manuipulate file_name string */
+        char* fn_copy = palloc_get_page(0);
+        if (NULL == fn_copy) {
+            return !success;
+        }
+        strlcpy (fn_copy, file_name, PGSIZE);
+
+
+        /* Tokenize the command */
+        int argc = 0;
+        char *argv[256];
+        char* next;
+        char *arg = strtok_r(fn_copy, " ", &next);
+        int length = 0;
+        int total_length = 0;
+        while (arg != NULL) {
+            length = strlen(arg) + 1;
+            *esp -= (length - 1);
+            argv[argc] = *esp;
+            ++argc;
+            memcpy(*esp, arg, length);
+            total_length += length;
+        }
+        /* Word-alignment */
+        *esp -= (4 - total_length % 4) % 4;
+        /* push argv[argc] into stack */
+        *esp -= sizeof(char *);
+        memset(*esp, 0, sizeof(char *));
+
+        int i;
+        for (i = argc - 1; i >= 0; --i) {
+            *esp -= sizeof (char *);
+            *(int *)*esp = argv[i];
+        }
+        /* push argv, then argc. */
+        *esp -= sizeof(char **);
+        *(int *)*esp = *esp + sizeof(char*);
+        *esp -= sizeof(int);
+        *(int *)*esp = argc;
+        /* push fake return address */
+        *esp -= sizeof(void(*)());
+        memset(*esp, 0, sizeof(void(*)()));
+
+
+        palloc_free_page(fn_copy);
+
+      }
+      else {
         palloc_free_page (kpage);
+      }
     }
   return success;
 }

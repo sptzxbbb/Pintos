@@ -106,7 +106,7 @@ open (const char *file)
 }
 
 int
-filesize (int fd) 
+filesize (int fd)
 {
   return syscall1 (SYS_FILESIZE, fd);
 }

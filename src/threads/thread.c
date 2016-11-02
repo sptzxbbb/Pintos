@@ -111,6 +111,8 @@ thread_init (void)
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
   initial_thread->wakeup_ticks = 0;
+
+  initial_thread->ret = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.

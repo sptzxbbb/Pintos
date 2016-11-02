@@ -82,39 +82,41 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread
 {
-    /* Owned by thread.c. */
-    tid_t tid;                          /* Thread identifier. */
-    enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
-    uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
-;
-    struct list_elem allelem;           /* List element for all threads list. */
+  /* Owned by thread.c. */
+  tid_t tid;                          /* Thread identifier. */
+  enum thread_status status;          /* Thread state. */
+  char name[16];                      /* Name (for debugging purposes). */
+  uint8_t *stack;                     /* Saved stack pointer. */
+  int priority;                       /* Priority. */
+  ;
+  struct list_elem allelem;           /* List element for all threads list. */
 
-    /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+  /* Shared between thread.c and synch.c. */
+  struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+  /* Owned by userprog/process.c. */
+  uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
+  /* Owned by thread.c. */
+  unsigned magic;                     /* Detects stack overflow. */
 
-    /* The time when thread is supposed to be unblocked */
-    int64_t wakeup_ticks;
-    /* The priority in the first place */
-    int pristine_priority;
-    /* The lock that it is waiting for */
-    struct lock *blocked_by_lock;
-    /* The locks that this thread holds */
-    struct list locks_holding_list;
-    /* the cpu time that thread reveived recently */
-    fixed_t recent_cpu;
-    /* a parameter used to set priority */
-    int nice;
-  };
+  /* The time when thread is supposed to be unblocked */
+  int64_t wakeup_ticks;
+  /* The priority in the first place */
+  int pristine_priority;
+  /* The lock that it is waiting for */
+  struct lock *blocked_by_lock;
+  /* The locks that this thread holds */
+  struct list locks_holding_list;
+  /* the cpu time that thread reveived recently */
+  fixed_t recent_cpu;
+  /* a parameter used to set priority */
+  int nice;
+
+  int ret;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

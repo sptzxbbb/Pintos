@@ -127,6 +127,7 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+      printf("%s: exit(%d)\n", cur->name, cur->ret);
     }
 }
 

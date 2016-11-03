@@ -825,3 +825,44 @@ incremented_recent_cpu (void)
         cur->recent_cpu = ADD_INT (cur->recent_cpu, 1);
     }
 }
+
+
+void extra_command_name(char *cmd_string, char *command_name) {
+  char *save_ptr;
+
+}
+
+void extra_command_args(char *cmd_string, int *argc, char *argv[]) {
+  char *save_ptr;
+  argv[0] = strtok_r(cmd_string, " ", &save_ptr);
+  char *token;
+  *argc = 1;
+  while (token = strtok_r(NULL, " ", &save_ptr)) {
+    argv[(*argc)] = token;
+    *argc += 1;
+  }
+}
+
+
+static void
+extract_command_name(char * cmd_string, char *command_name)
+{
+  char *save_ptr;
+  strlcpy (command_name, cmd_string, PGSIZE);
+  command_name = strtok_r(command_name, " ", &save_ptr);
+}
+
+static void
+extract_command_args(char * cmd_string, char* argv[], int *argc)
+{
+  char *save_ptr;
+  argv[0] = strtok_r(cmd_string, " ", &save_ptr);
+  char *token;
+  *argc = 1;
+  while((token = strtok_r(NULL, " ", &save_ptr))!=NULL)
+    {
+      argv[(*argc)++] = token;
+    }
+}
+
+

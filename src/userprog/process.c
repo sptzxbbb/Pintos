@@ -343,7 +343,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
-
   success = true;
 
  done:
@@ -351,7 +350,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);

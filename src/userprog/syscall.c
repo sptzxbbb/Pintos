@@ -25,7 +25,7 @@ static void syscall_seek (struct intr_frame *f);
 static void syscall_tell (struct intr_frame *f);
 static void syscall_close (struct intr_frame *f);
 
-
+void ExitStatus(int status);
 
 void
 syscall_init (void)
@@ -68,7 +68,6 @@ syscall_handler (struct intr_frame *f)
     printf("This system call is not implemented yet!\n");
     ExitStatus(-1);
   }
-
   syscall_handlers[num](f);
 }
 
@@ -127,7 +126,6 @@ syscall_read (struct intr_frame *f) {
 static void
 syscall_write (struct intr_frame *f) {
   int *esp = (int *)f->esp;
-
   if (!is_user_vaddr(esp + 7)) {
     printf("invalid user vaddr\n");
     ExitStatus(-1);
@@ -140,7 +138,8 @@ syscall_write (struct intr_frame *f) {
   if (fd == STDOUT_FILENO) {
     putbuf(buffer, size);
     f->eax = 0;
-    return 0;
+  } else {
+
   }
 }
 

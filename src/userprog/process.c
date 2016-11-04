@@ -336,14 +336,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
           break;
         }
     }
-  printf("before setup_stack()\n");
   /* Set up stack. */
   if (!setup_stack (esp, argv, argc)) {
     goto done;
   }
-  printf("after setup_stack()\n");
 
-  printf("start address\n");
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 

@@ -112,7 +112,6 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
   initial_thread->wakeup_ticks = 0;
 
-  initial_thread->ret = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -316,6 +315,8 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+
 
   intr_set_level (old_level);
 
@@ -633,6 +634,17 @@ init_thread (struct thread *t, const char *name, int priority)
   t->blocked_by_lock = NULL;
   t->nice = 0;
   t->recent_cpu = CONVERT_TO_FP (0);
+  /* project 2 Implementation */
+  t->ret = 0;
+#ifdef USERPROG
+  list_init(&t->file_table);
+  t->opened_file_num = 0;
+  t->next_fd = 2;
+
+
+#endif // USERPROG
+
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

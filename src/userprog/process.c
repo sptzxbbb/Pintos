@@ -556,3 +556,23 @@ extract_command_args(char * cmd_string, char* argv[], int *argc)
       argv[(*argc)++] = token;
     }
 }
+
+
+int process_open (const char *file_name)
+{
+  struct file * f = filesys_open (file_name);
+  if (f == NULL) {
+    return -1;
+  }
+  struct fd_entry *fd_entry = malloc (sizeof(struct fd_entry));
+  if (fd_entry == NULL) {
+    return -1;
+  }
+  struct thread* cur = thread_current();
+  fd_entry->fd = cur->next_fd;
+  fd_entry->file = f;
+  cur->next_fd += 1;
+  cur->opened_file_num += 1;
+  list_push_back(&thread_current()->file_table, &fd_entry->elem);
+  return fd_entry->fd;
+}

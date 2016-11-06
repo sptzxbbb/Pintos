@@ -651,8 +651,7 @@ process_close_all (void)
       process_close(tmp->fd);
       e = list_next (e);
   }
-}
-
+}         
 
 int
 process_read (int fd, void *buffer, unsigned size) {

@@ -21,34 +21,7 @@ static void syscall_handler (struct intr_frame *);
 /* Array of syscall functions */
 static int (*syscall_handlers[MAX_SYSCALL]) (struct intr_frame *);
 
-static void syscall_halt (struct intr_frame *f);
-static void syscall_exit(struct intr_frame *f);
-static pid_t syscall_exec (struct intr_frame *f);
-static int syscall_wait (struct intr_frame *f);
-static bool syscall_create (struct intr_frame *f);
-static bool syscall_remove (struct intr_frame *f);
-static int syscall_open (struct intr_frame *f);
-static int syscall_filesize (struct intr_frame *f);
-static int syscall_read (struct intr_frame *f);
-static int syscall_write (struct intr_frame *f);
-static void syscall_seek (struct intr_frame *f);
-static unsigned syscall_tell (struct intr_frame *f);
-static void syscall_close (struct intr_frame *f);
-
-struct fd_entry* open_file(struct thread *t, int fd);
-int close_file(struct thread* t, int fd, bool all);
 void ExitStatus(int status);
-static inline bool is_valid_stack_pointer(const void  *vaddr);
-
-/* Returns true if UADDR is a valid, mapped user address,
-   false otherwise. */
-static bool
-verify_user (const void *uaddr)
-{
-  return (uaddr < PHYS_BASE &&
-          uaddr > CODESEG_BASE &&
-          pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
-}
 
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
@@ -57,7 +30,7 @@ verify_user (const void *uaddr)
 static int
 get_user (const uint8_t *uaddr)
 {
-  if(!is_user_vaddr(uaddr) || uaddr < CODESEG_BASE)
+  if(!is_user_vaddr(uaddr))
     return -1;
   int result;
   asm ("movl $1f, %0; movzbl %1, %0; 1:"
@@ -101,6 +74,140 @@ static bool is_valid_string(void * str)
       return false;
 }
 
+
+// non-normal exit.
+static void
+kill_program(void) {
+  struct thread *cur = thread_current();
+  cur->ret = -1;
+  thread_exit();
+}
+
+
+
+static void
+syscall_halt (struct intr_frame *f) {
+  shutdown_power_off();
+  f->eax = 0;
+}
+
+static void
+syscall_exit (struct intr_frame *f) {
+  if (!is_user_vaddr(((int *)f->esp) + 2)) {
+    kill_program();
+  }
+
+  struct thread *cur = thread_current();
+  cur->ret = *((int *)f->esp + 1);
+  f->eax = 0;
+  thread_exit();
+}
+
+static pid_t
+syscall_exec (struct intr_frame *f) {
+  
+}
+static int
+syscall_wait (struct intr_frame *f) {
+
+}
+static bool
+syscall_create (struct intr_frame *f) {
+
+}
+
+static bool
+syscall_remove (struct intr_frame *f) {
+
+}
+
+static int
+syscall_open (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4) ||
+      !is_valid_string(*(char **)(f->esp + 4))) {
+    f->eax = -1;
+    return -1;
+  }
+  const char* file_name = (char *)*((int *)f->esp + 1);
+  f->eax = process_open(file_name);
+  return 0;
+}
+
+static int
+syscall_filesize (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+    return -1;
+  }
+  int fd = * (int * )(f->esp + 4);
+  f->eax = process_filesize(fd);
+  return 0;
+}
+
+static int
+syscall_read (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 12)) {
+    return -1;
+  }
+  int fd = *(int *)(f->esp + 4);
+  void *buffer = *(char **)(f->esp + 8);
+  unsigned size = *(unsigned *)(f->esp + 12);
+
+  if (!is_valid_pointer(buffer, 1) || !is_valid_pointer(buffer + size, 1)) {
+    return -1;
+  }
+  int written_size = process_read(fd, buffer, size);
+  f->eax = written_size;
+  return 0;
+}
+
+static int
+syscall_write (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 12)) {
+      return -1;
+  }
+  int fd = *(int *)(f->esp + 4);
+  void *buffer = *(char **)(f->esp + 8);
+  unsigned size = *(unsigned *)(f->esp + 12);
+
+  if (!is_valid_pointer(buffer, 1) || !is_valid_pointer(buffer + size, 1)) {
+    return -1;
+  }
+  int written_size = process_write(fd, buffer, size);
+  f->eax = written_size;
+  return 0;
+}
+
+static void
+syscall_seek (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+    return -1;
+  }
+  int fd = *(int *)(f->esp + 4);
+  unsigned pos = *(unsigned *)(f->esp + 8);
+  f->eax = process_tell(fd, pos);
+  return 0;
+}
+
+static unsigned
+syscall_tell (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+      return -1;
+  }
+  int fd = *(int *)(f->esp + 4);
+  f->eax = process_tell(fd);
+  return 0;
+}
+
+static void
+syscall_close (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+    return -1;
+  }
+  int fd = *(int *)(f->esp + 4);
+  process_close(fd);
+  return 0;
+}
+
 void
 syscall_init (void)
 {
@@ -127,8 +234,8 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  if (!verify_user(f->esp)) {
-    ExitStatus(-1);
+  if (!is_valid_pointer(f->esp, 4)) {
+    kill_program();
   }
 
   int num = *((int *)(f->esp));
@@ -136,204 +243,14 @@ syscall_handler (struct intr_frame *f)
   if (num >= MAX_SYSCALL || num < 0)
     {
       printf("We don't have this System Call!\n");
-      ExitStatus(-1);
+      kill_program();
     }
   if (!syscall_handlers[num])
     {
       printf("this System Call %d not Implement!\n", num);
-      ExitStatus(-1);
+      kill_program();
     }
   if (syscall_handlers[num](f) == -1) {
-    ExitStatus(-1);
+    kill_program();
   }
-}
-
-static void
-syscall_halt (struct intr_frame *f) {
-  shutdown_power_off();
-  f->eax = 0;
-}
-
-static void
-syscall_exit (struct intr_frame *f) {
-  if (!is_user_vaddr(((int *)f->esp) + 2)) {
-    ExitStatus(-1);
-  }
-
-  struct thread *cur = thread_current();
-  cur->ret = *((int *)f->esp + 1);
-  f->eax = 0;
-  thread_exit();
-}
-
-static pid_t
-syscall_exec (struct intr_frame *f) {
-
-}
-static int
-syscall_wait (struct intr_frame *f) {
-
-}
-static bool
-syscall_create (struct intr_frame *f) {
-
-}
-
-static bool
-syscall_remove (struct intr_frame *f) {
-
-}
-
-static int
-syscall_open (struct intr_frame *f) {
-  if (!is_valid_pointer(f->esp + 4, 4) ||
-      !is_valid_string(*(char **)(f->esp + 4))) {
-    f->eax = -1;
-    return -1;
-  }
-
-  const char* file_name = (char *)*((int *)f->esp + 1);
-
-  f->eax = process_open(file_name);
-  return 0;
-
-//   // empty string or null
-//   if (!file_name || strlen(file_name) == 0) {
-//     f->eax = -1;
-//     return -1;
-//   } else {
-//     struct file* _file = filesys_open(file_name);
-//     // missing file
-//     if (_file == NULL) {
-//       f->eax = -1;
-//       return -1;
-//     }
-//     struct file_entry *fn = malloc (sizeof(struct file_entry));
-//     // memory alloc failed
-//     if (fn == NULL) {
-//       f->eax = -1;
-//       return -1;
-//     }
-//     struct thread* cur = thread_current();
-
-//     fn->f = _file;
-//     fn->fd = cur->next_fd;
-//     cur->next_fd += 1;
-//     cur->opened_file_num += 1;
-//     list_push_back(&cur->file_table, &fn->elem);
-//     f->eax = fn->fd;
-//     return fn->fd;
-//   }
-}
-
-static int
-syscall_filesize (struct intr_frame *f) {
-
-}
-
-static int
-syscall_read (struct intr_frame *f) {
-
-}
-
-static int
-syscall_write (struct intr_frame *f) {
-  int *esp = (int *)f->esp;
-  if (!is_user_vaddr(esp + 7)) {
-    ExitStatus(-1);
-  }
-
-  int fd = *(esp + 2);
-  unsigned size = *(esp + 3);
-  char *buffer = (char *)*(esp + 6);
-
-  if (fd == STDOUT_FILENO) {
-    putbuf(buffer, size);
-    f->eax = 0;
-  } else {
-    struct thread* cur = thread_current();
-    struct fd_entry *fn = open_file(cur, fd);
-    if (!fn) {
-      f->eax = 0;
-      return;
-    }
-    f->eax = file_write(fn->file, buffer, size);
-  }
-}
-
-static void
-syscall_seek (struct intr_frame *f) {
-
-}
-
-static unsigned
-syscall_tell (struct intr_frame *f) {
-
-}
-
-static void
-syscall_close (struct intr_frame *f) {
-  if (!is_user_vaddr(((int *)f->esp) + 2)) {
-    ExitStatus(-1);
-  }
-  struct thread* cur = thread_current();
-  int fd = *((int *)f->esp + 1);
-  f->eax = close_file(cur, fd, false);
-}
-
-int
-close_file (struct thread* t, int fd, bool all) {
-  struct list_elem *e;
-  if (all) {
-    while (!list_empty(&t->file_table)) {
-      struct fd_entry *fn = list_entry(list_pop_front(&t->file_table), struct fd_entry, elem);
-      file_close(fn->file);
-      free(fn);
-    }
-    t->opened_file_num = 0;
-    return 0;
-  } else {
-    struct fd_entry *fn;
-    for (e = list_begin(&t->file_table); e != list_end(&t->file_table); e = list_next(e)) {
-      fn = list_entry(e, struct fd_entry, elem);
-      if (fn->fd == fd) {
-        list_remove(e);
-        if (fd == t->next_fd - 1) {
-          t->next_fd -= 1;
-        }
-        t->opened_file_num -= 1;
-        file_close(fn->file);
-        free(fn);
-        return 0;
-      }
-    }
-  }
-}
-
-struct fd_entry*
-open_file(struct thread *t, int fd) {
-  struct list_elem *e;
-  for (e = list_begin(&t->file_table); e != list_end(&t->file_table); e = list_next(e)) {
-    struct fd_entry* fn = list_entry(e, struct fd_entry, elem);
-    if (fn->fd == fd) {
-      return fn;
-    }
-  }
-  return NULL;
-}
-
-// non-normal exit.
-void
-ExitStatus(int status)
-{
-  struct thread *cur = thread_current();
-  cur->ret=status;
-  thread_exit();
-}
-
-
-static inline bool
-is_valid_stack_pointer(const void *vaddr)
-{
-  return (vaddr <= PHYS_BASE && vaddr > CODESEG_BASE);
 }

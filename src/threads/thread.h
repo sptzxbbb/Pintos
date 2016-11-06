@@ -25,7 +25,6 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* The maximum file numbers a thread can open */
-#define MAXFILENUM  1024
 
 
 /* A kernel thread or user process.
@@ -102,7 +101,6 @@ struct thread
   /* Owned by userprog/process.c. */
   uint32_t *pagedir;                  /* Page directory. */
   struct list file_table;
-  int opened_file_num;
   int next_fd;
 #endif
 

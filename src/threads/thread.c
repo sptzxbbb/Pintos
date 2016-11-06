@@ -638,13 +638,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->ret = 0;
 #ifdef USERPROG
   list_init(&t->file_table);
-  t->opened_file_num = 0;
   t->next_fd = 2;
-
-
 #endif // USERPROG
-
-
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

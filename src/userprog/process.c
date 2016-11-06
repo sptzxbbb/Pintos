@@ -23,6 +23,16 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static void extract_command_name(char * cmd_string, char *command_name);
 static void extract_command_args(char * cmd_string, char* argv[], int *argc);
 
+
+
+struct fd_entry
+{
+  int fd;
+  struct file *file;
+  struct list_elem elem;
+};
+
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -558,7 +568,34 @@ extract_command_args(char * cmd_string, char* argv[], int *argc)
 }
 
 
-int process_open (const char *file_name)
+static struct fd_entry*
+get_fd_entry(int fd)
+{
+  struct list_elem *e;
+  struct fd_entry *fe = NULL;
+  struct list *fd_table = &thread_current()->file_table;
+
+  struct fd_entry *tmp;
+  for (e = list_begin (fd_table); e != list_end (fd_table);
+       e = list_next (e)) {
+    tmp = list_entry (e, struct fd_entry, elem);
+    if (tmp->fd == fd) {
+      fe = tmp;
+      break;
+    }
+  }
+  return fe;
+}
+
+static int
+allocate_fd (void)
+{
+  return thread_current()->next_fd++;
+}
+
+
+int
+process_open (const char *file_name)
 {
   struct file * f = filesys_open (file_name);
   if (f == NULL) {
@@ -569,10 +606,89 @@ int process_open (const char *file_name)
     return -1;
   }
   struct thread* cur = thread_current();
-  fd_entry->fd = cur->next_fd;
+  fd_entry->fd = allocate_fd();
   fd_entry->file = f;
-  cur->next_fd += 1;
-  cur->opened_file_num += 1;
   list_push_back(&thread_current()->file_table, &fd_entry->elem);
   return fd_entry->fd;
 }
+
+int
+process_write(int fd, const void *buffer, unsigned size)
+{
+  if (fd == STDOUT_FILENO) {
+    putbuf((char *)buffer, (size_t)size);
+    return (int)size;
+  } else if (get_fd_entry(fd) != NULL) {
+    return (int)file_write(get_fd_entry(fd)->file, buffer, size);
+  } else {
+    NOT_REACHED()
+  }
+}
+
+
+void
+process_close (int fd)
+{
+  struct fd_entry *fe = get_fd_entry(fd);
+  if (fe != NULL) {
+    file_close(fe->file);
+    list_remove(&fe->elem);
+    free(fe);
+  }
+}
+
+void
+process_close_all (void)
+{
+  struct list *fd_table = &thread_current()->file_table;
+  struct list_elem *e = list_begin (fd_table);
+  while (e != list_end (fd_table))
+    {
+      struct fd_entry *tmp = list_entry (e, struct fd_entry, elem);
+      process_close(tmp->fd);
+      e = list_next (e);
+  }
+}
+
+
+int
+process_read (int fd, void *buffer, unsigned size) {
+  struct fd_entry* fe = get_fd_entry(fd);
+  if (fe != NULL) {
+    return file_read(fe->file, buffer, size);
+  } else {
+    return -1;
+  }
+}
+
+int
+process_filesize (int fd)
+{
+  struct fd_entry* fe = get_fd_entry(fd);
+  if (fe != NULL) {
+    return file_length(fe->file);
+  } else {
+    return -1;
+  }
+}
+
+int
+process_tell (int fd)
+{
+  struct fd_entry* fe = get_fd_entry(fd);
+  if (fe != NULL) {
+    return file_tell(fe->file);
+  } else {
+    return -1;
+  }
+}
+
+void
+process_seek (int fd, unsigned position)
+{
+  struct fd_entry* fe = get_fd_entry(fd);
+  if (fe != NULL) {
+    return file_seek(fe->file, position);
+  }
+}
+

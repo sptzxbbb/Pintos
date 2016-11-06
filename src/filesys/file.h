@@ -5,14 +5,6 @@
 #include "lib/kernel/list.h"
 
 struct inode;
-
-struct fd_entry {
-  int fd;
-  struct file* file;
-  struct list_elem elem;
-};
-
-
 struct file;
 /* Opening and closing files. */
 struct file *file_open (struct inode *);

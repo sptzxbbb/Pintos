@@ -89,12 +89,12 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks)
 {
-  ASSERT (intr_get_level() == INTR_ON)
-    if (ticks <= 0)
+  if (ticks <= 0)
     {
-        return;
+      return;
     }
-    thread_sleep(ticks);
+  ASSERT (intr_get_level() == INTR_ON);
+  thread_sleep(ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -166,14 +166,13 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_wakeup();
-  thread_tick ();
+  thread_tick (ticks);
   /* my 4.4 BSD scheduler implemention */
   if (thread_mlfqs)
   {

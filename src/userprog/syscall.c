@@ -35,8 +35,10 @@ get_user (const uint8_t *uaddr)
   int result;
   asm ("movl $1f, %0; movzbl %1, %0; 1:"
        : "=&a" (result) : "m" (*uaddr));
+  // printf("get_user() %d\n", result);
   return result;
 }
+
 
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
@@ -83,8 +85,6 @@ kill_program(void) {
   thread_exit();
 }
 
-
-
 static void
 syscall_halt (struct intr_frame *f) {
   shutdown_power_off();
@@ -96,7 +96,6 @@ syscall_exit (struct intr_frame *f) {
   if (!is_user_vaddr(((int *)f->esp) + 2)) {
     kill_program();
   }
-
   struct thread *cur = thread_current();
   cur->ret = *((int *)f->esp + 1);
   f->eax = 0;
@@ -105,7 +104,7 @@ syscall_exit (struct intr_frame *f) {
 
 static pid_t
 syscall_exec (struct intr_frame *f) {
-  
+
 }
 static int
 syscall_wait (struct intr_frame *f) {
@@ -123,9 +122,8 @@ syscall_remove (struct intr_frame *f) {
 
 static int
 syscall_open (struct intr_frame *f) {
-  if (!is_valid_pointer(f->esp + 4, 4) ||
-      !is_valid_string(*(char **)(f->esp + 4))) {
-    f->eax = -1;
+  if (!is_valid_pointer(f->esp + 4, 4) || !is_valid_string(*(char **)(f->esp + 4))) {
+    // printf("open 1\n");
     return -1;
   }
   const char* file_name = (char *)*((int *)f->esp + 1);
@@ -159,10 +157,11 @@ syscall_read (struct intr_frame *f) {
   f->eax = written_size;
   return 0;
 }
-
+ 
 static int
 syscall_write (struct intr_frame *f) {
   if (!is_valid_pointer(f->esp + 4, 12)) {
+    // printf("write() a\n");
       return -1;
   }
   int fd = *(int *)(f->esp + 4);
@@ -170,6 +169,7 @@ syscall_write (struct intr_frame *f) {
   unsigned size = *(unsigned *)(f->esp + 12);
 
   if (!is_valid_pointer(buffer, 1) || !is_valid_pointer(buffer + size, 1)) {
+    // printf("write() b\n");
     return -1;
   }
   int written_size = process_write(fd, buffer, size);
@@ -229,7 +229,7 @@ syscall_init (void)
   syscall_handlers[SYS_SEEK] = &syscall_seek;
   syscall_handlers[SYS_TELL] = &syscall_tell;
   syscall_handlers[SYS_CLOSE] = &syscall_close;
-};
+}
 
 static void
 syscall_handler (struct intr_frame *f)
@@ -237,7 +237,6 @@ syscall_handler (struct intr_frame *f)
   if (!is_valid_pointer(f->esp, 4)) {
     kill_program();
   }
-
   int num = *((int *)(f->esp));
 
   if (num >= MAX_SYSCALL || num < 0)

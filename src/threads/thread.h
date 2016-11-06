@@ -132,7 +132,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_tick (int64_t);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);

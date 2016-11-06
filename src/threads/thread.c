@@ -134,8 +134,20 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void)
+thread_tick (int64_t ticks)
 {
+  struct list_elem *e = list_begin (&sleep_list);
+  while (e != list_end (&sleep_list)) {
+      struct thread *t = list_entry (e, struct thread, elem);
+      if (ticks >= t->wakeup_ticks) {
+        t->wakeup_ticks = 0;
+        e = list_remove(e);
+        thread_unblock(t);
+      } else {
+        break;
+      }
+  }
+
   struct thread *t = thread_current ();
 
   /* Update statistics. */
@@ -154,31 +166,6 @@ thread_tick (void)
 }
 
 
-/* check all the sleeping thread which should wakeup */
-void
-thread_wakeup(void)
-{
-  struct list_elem *cur; // Current element in the list
-  struct list_elem *next; // Next element connected to the current one
-  struct thread *t;
-
-  if (list_empty (&sleep_list))
-    return;
-
-  cur = list_begin (&sleep_list);
-  while (cur != list_end (&sleep_list))
-    {
-        next = list_next (cur);
-        t = list_entry (cur, struct thread, elem);
-        if (t->wakeup_ticks > timer_ticks())
-        break;
-
-        list_remove(cur);
-        thread_unblock(t);
-
-        cur = next;
-    }
-}
 
 /* sleep the current thread for ticks */
 void
@@ -641,6 +628,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->next_fd = 2;
 #endif // USERPROG
 }
+
+
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
    returns a pointer to the frame's base. */

@@ -62,6 +62,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     free(cmd_name);
+    return -1;
   }
   return tid;
 }
@@ -593,22 +594,24 @@ allocate_fd (void)
   return thread_current()->next_fd++;
 }
 
-
 int
 process_open (const char *file_name)
 {
   struct file * f = filesys_open (file_name);
   if (f == NULL) {
+    // printf("open missing\n");
     return -1;
   }
   struct fd_entry *fd_entry = malloc (sizeof(struct fd_entry));
   if (fd_entry == NULL) {
+    // printf("no memory\n");
     return -1;
   }
   struct thread* cur = thread_current();
   fd_entry->fd = allocate_fd();
   fd_entry->file = f;
   list_push_back(&thread_current()->file_table, &fd_entry->elem);
+  // printf("fd:   %d\n", fd_entry->fd);
   return fd_entry->fd;
 }
 

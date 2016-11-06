@@ -20,6 +20,8 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -89,12 +91,14 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks)
 {
-  ASSERT (intr_get_level() == INTR_ON)
-    if (ticks <= 0)
-    {
-        return;
-    }
-    thread_sleep(ticks);
+  if (ticks <= 0){
+    return;
+  }
+  ASSERT (intr_get_level () == INTR_ON);
+
+  int64_t start = timer_ticks ();
+
+  thread_sleep(start + ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,22 +176,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_wakeup();
-  thread_tick ();
-  /* my 4.4 BSD scheduler implemention */
-  if (thread_mlfqs)
-  {
-      incremented_recent_cpu ();
-      if (0 == ticks % TIMER_FREQ)
-      {
-          calculate_load_avg ();
-          calculate_recent_cpu_foreach ();
-      }
-      if (0 == ticks % 4)
-      {
-          calculate_priority_foreach ();
-      }
-  }
+  thread_tick (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

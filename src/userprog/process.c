@@ -22,8 +22,7 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static void extract_command_name(char * cmd_string, char *command_name);
 static void extract_command_args(char * cmd_string, char* argv[], int *argc);
-
-
+static struct thread* find_child(tid_t child_tid);
 
 struct fd_entry
 {
@@ -109,13 +108,24 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-  /* while (true) { */
+  struct thread *cur, *t;
+  t= thread_by_tid(child_tid);
+  cur = thread_current();
 
-  /*   } */
+  if (!t || t->parent != cur || t->waited) {
+    return RET_STATUS_ERROR;
+  } else if (t->exited || t->ret != RET_STATUS_INIT) {
+    return t->ret;
+  }
 
-  return -1;
+  sema_down(&t->sema_wait);
+  int ret = t->ret;
+  sema_up(&t->sema_exit);
+  // why?
+  t->waited = true;
+  return ret;
 }
 
 /* Free the current process's resources. */
@@ -124,6 +134,17 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  printf("%s: exit(%d)\n", cur->name, cur->ret);
+  // close open file descriptors;
+  process_close_all();
+
+  while (!list_empty(&cur->sema_wait.waiters)) {
+    sema_up(&cur->sema_wait);
+  }
+  cur->exited = true;
+  if (cur->parent != NULL) {
+    sema_down(&cur->sema_exit);
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -140,8 +161,10 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      printf("%s: exit(%d)\n", cur->name, cur->ret);
     }
+
+
+
 }
 
 /* Sets up the CPU for running user code in the current
@@ -358,7 +381,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if (success) {
+    thread_current()->executable = file;
+    file_deny_write(file);
+  } else {
+    file_close (file);
+  }
   return success;
 }
 /* load() helpers. */
@@ -618,13 +646,14 @@ process_open (const char *file_name)
 int
 process_write(int fd, const void *buffer, unsigned size)
 {
+  struct fd_entry *fe = get_fd_entry(fd);
   if (fd == STDOUT_FILENO) {
     putbuf((char *)buffer, (size_t)size);
     return (int)size;
-  } else if (get_fd_entry(fd) != NULL) {
-    return (int)file_write(get_fd_entry(fd)->file, buffer, size);
+  } else if (fe != NULL) {
+    return (int)file_write(fe->file, buffer, size);
   } else {
-    NOT_REACHED()
+    return -1;
   }
 }
 
@@ -640,22 +669,29 @@ process_close (int fd)
   }
 }
 
+// close all open files including the executable
 void
 process_close_all (void)
 {
-  struct list *fd_table = &thread_current()->file_table;
+  struct thread *cur = thread_current();
+  struct list *fd_table = &cur->file_table;
   struct list_elem *e = list_begin (fd_table);
   while (e != list_end (fd_table))
     {
       struct fd_entry *tmp = list_entry (e, struct fd_entry, elem);
-      process_close(tmp->fd);
       e = list_next (e);
+      process_close(tmp->fd);
   }
-}         
+  file_close(cur->executable);
+  // printf("process_close_all() ends \n");
+}
 
 int
 process_read (int fd, void *buffer, unsigned size) {
   struct fd_entry* fe = get_fd_entry(fd);
+  // TODO
+  if (fd == STDIN_FILENO) {
+  }
   if (fe != NULL) {
     return file_read(fe->file, buffer, size);
   } else {
@@ -693,4 +729,20 @@ process_seek (int fd, unsigned position)
     return file_seek(fe->file, position);
   }
 }
+
+static struct thread*
+find_child(tid_t child_tid)
+{
+  struct thread *parent = thread_current ();
+  struct list_elem *e;
+  for (e = list_begin(&parent->children); e != list_end(&parent->children); e = list_next(e))
+    {
+      struct thread *t = list_entry(e, struct thread, child_elem);
+      if (t->tid == child_tid) {
+        return t;
+      }
+    }
+  return NULL;
+}
+
 

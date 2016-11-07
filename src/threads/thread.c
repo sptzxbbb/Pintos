@@ -303,9 +303,28 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-
-
   intr_set_level (old_level);
+
+#ifdef USERPROG
+  sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_exit, 0);
+  t->ret = RET_STATUS_INIT;
+
+  list_init(&t->children);
+
+  struct thread *cur = thread_current();
+  t->waited = false;
+  t->exited = false;
+  t->parent = cur;
+
+  t->next_fd = 2;
+
+  if (cur != initial_thread) {
+    list_push_back(&cur->children, &t->child_elem);
+  }
+  list_init(&t->file_table);
+#endif // USERPROG
+
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -313,6 +332,7 @@ thread_create (const char *name, int priority,
   {
     thread_yield();
   }
+
   return tid;
 }
 
@@ -621,15 +641,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->blocked_by_lock = NULL;
   t->nice = 0;
   t->recent_cpu = CONVERT_TO_FP (0);
-  /* project 2 Implementation */
-  t->ret = 0;
-#ifdef USERPROG
-  list_init(&t->file_table);
-  t->next_fd = 2;
-#endif // USERPROG
 }
-
-
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
    returns a pointer to the frame's base. */
@@ -822,43 +834,17 @@ incremented_recent_cpu (void)
     }
 }
 
-
-void extra_command_name(char *cmd_string, char *command_name) {
-  char *save_ptr;
-
-}
-
-void extra_command_args(char *cmd_string, int *argc, char *argv[]) {
-  char *save_ptr;
-  argv[0] = strtok_r(cmd_string, " ", &save_ptr);
-  char *token;
-  *argc = 1;
-  while (token = strtok_r(NULL, " ", &save_ptr)) {
-    argv[(*argc)] = token;
-    *argc += 1;
-  }
-}
-
-
-static void
-extract_command_name(char * cmd_string, char *command_name)
+struct thread*
+thread_by_tid (tid_t child_tid)
 {
-  char *save_ptr;
-  strlcpy (command_name, cmd_string, PGSIZE);
-  command_name = strtok_r(command_name, " ", &save_ptr);
-}
-
-static void
-extract_command_args(char * cmd_string, char* argv[], int *argc)
-{
-  char *save_ptr;
-  argv[0] = strtok_r(cmd_string, " ", &save_ptr);
-  char *token;
-  *argc = 1;
-  while((token = strtok_r(NULL, " ", &save_ptr))!=NULL)
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
     {
-      argv[(*argc)++] = token;
+      struct thread *t = list_entry(e, struct thread, allelem);
+      if (t->tid == child_tid) {
+        return t;
+      }
     }
+  return NULL;
 }
-
 

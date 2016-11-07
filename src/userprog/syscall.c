@@ -81,7 +81,7 @@ static bool is_valid_string(void * str)
 static void
 kill_program(void) {
   struct thread *cur = thread_current();
-  cur->ret = -1;
+  cur->ret = RET_STATUS_ERROR;
   thread_exit();
 }
 
@@ -157,7 +157,7 @@ syscall_read (struct intr_frame *f) {
   f->eax = written_size;
   return 0;
 }
- 
+
 static int
 syscall_write (struct intr_frame *f) {
   if (!is_valid_pointer(f->esp + 4, 12)) {
@@ -251,5 +251,18 @@ syscall_handler (struct intr_frame *f)
     }
   if (syscall_handlers[num](f) == -1) {
     kill_program();
+  }
+}
+
+
+static void
+syscall_handler2 (struct intr_frame *f)
+{
+  if (!is_valid_pointer(f->esp, 4)) {
+    kill_program();
+  }
+  int num = *((int *)(f->esp));
+
+  switch (num) {
   }
 }

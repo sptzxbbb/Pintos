@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/fixed_point.h"
 /* States in a thread's life cycle. */
 enum thread_status
@@ -18,6 +19,9 @@ enum thread_status
    You can redefine this to whatever type you like. */
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+
+#define RET_STATUS_INIT 0
+#define RET_STATUS_ERROR -1
 
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
@@ -100,8 +104,26 @@ struct thread
 #ifdef USERPROG
   /* Owned by userprog/process.c. */
   uint32_t *pagedir;                  /* Page directory. */
+
+  struct thread *parent;
+  struct list children;
+  struct list_elem child_elem;
+
   struct list file_table;
   int next_fd;
+  // the current file code referring, used to deny writing as long as
+  // the process is running(and close it upon exit)
+  struct file *executable;
+
+  struct semaphore sema_wait;
+  struct semaphore sema_exit;
+
+
+  int ret;
+  // is the process exited
+  bool exited;
+  // is parent thread has cadded wait
+  bool waited;
 #endif
 
   /* Owned by thread.c. */
@@ -120,8 +142,6 @@ struct thread
   /* a parameter used to set priority */
   int nice;
   /* return value */
-  int ret;
-
 };
 
 /* If false (default), use round-robin scheduler.
@@ -161,7 +181,9 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 
-void thread_wakeup (void);
+struct thread* thread_by_tid (tid_t child_tid);
+
+
 void thread_sleep (int64_t ticks);
 bool thread_cmp_priority (struct list_elem *a, struct list_elem *b, void *aux);
 bool thread_cmp_wakeup_ticks (struct list_elem *a, struct list_elem *b, void *UNUSED);

@@ -148,16 +148,15 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
-
   // I also need to make sure that exception occurred while accessing user stack, not for every fault
   // how I can do that??
+  // project 2 implementation
   if (!user){
     f->eip = (void (*)(void))f->eax;
     f->eax= 0xffffffff;
-    // printf("exeception\n");
     return;
   }
+  thread_current()->ret = -1;
   thread_exit();
 
 

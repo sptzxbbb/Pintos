@@ -63,6 +63,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   }
   struct thread *t = thread_by_tid(tid);
+
   sema_down(&t->sema_wait);
   if (t->ret == RET_STATUS_ERROR) {
     tid = TID_ERROR;
@@ -132,6 +133,7 @@ process_wait (tid_t child_tid)
   int ret = t->ret;
   sema_up(&t->sema_exit);
   t->waited = true;
+  // remove_child(child_tid);
   return ret;
 }
 
@@ -143,6 +145,11 @@ process_exit (void)
   uint32_t *pd;
   printf("%s: exit(%d)\n", cur->name, cur->ret);
   // close open file descriptors;
+
+  if (cur->executable != NULL) {
+    file_allow_write(cur->executable);
+  }
+
   process_close_all();
 
   while (!list_empty(&cur->sema_wait.waiters)) {
@@ -631,19 +638,16 @@ process_open (const char *file_name)
 {
   struct file * f = filesys_open (file_name);
   if (f == NULL) {
-    // printf("open missing\n");
     return -1;
   }
   struct fd_entry *fd_entry = malloc (sizeof(struct fd_entry));
   if (fd_entry == NULL) {
-    // printf("no memory\n");
     return -1;
   }
   struct thread* cur = thread_current();
   fd_entry->fd = allocate_fd();
   fd_entry->file = f;
   list_push_back(&thread_current()->file_table, &fd_entry->elem);
-  // printf("fd:   %d\n", fd_entry->fd);
   return fd_entry->fd;
 }
 
@@ -656,9 +660,8 @@ process_write(int fd, const void *buffer, unsigned size)
     return (int)size;
   } else if (fe != NULL) {
     return (int)file_write(fe->file, buffer, size);
-  } else {
-    return -1;
   }
+  return -1;
 }
 
 
@@ -693,9 +696,6 @@ process_close_all (void)
 int
 process_read (int fd, void *buffer, unsigned size) {
   struct fd_entry* fe = get_fd_entry(fd);
-  // TODO
-  if (fd == STDIN_FILENO) {
-  }
   if (fe != NULL) {
     return file_read(fe->file, buffer, size);
   } else {

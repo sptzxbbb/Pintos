@@ -21,8 +21,6 @@ static void syscall_handler (struct intr_frame *);
 /* Array of syscall functions */
 static int (*syscall_handlers[MAX_SYSCALL]) (struct intr_frame *);
 
-void ExitStatus(int status);
-
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
    Returns the byte value if successful, -1 if a segfault
@@ -59,7 +57,7 @@ static bool is_valid_pointer(void * esp, uint8_t argc){
   uint8_t i = 0;
   for (; i < argc; ++i)
   {
-    if (get_user(((uint8_t *)esp)+i) == -1){
+    if (get_user(((uint8_t *)esp)+i) == -1) {
       return false;
     }
   }
@@ -192,7 +190,6 @@ syscall_read (struct intr_frame *f) {
 static int
 syscall_write (struct intr_frame *f) {
   if (!is_valid_pointer(f->esp + 4, 12)) {
-    // printf("write() a\n");
       return -1;
   }
   int fd = *(int *)(f->esp + 4);
@@ -200,7 +197,6 @@ syscall_write (struct intr_frame *f) {
   unsigned size = *(unsigned *)(f->esp + 12);
 
   if (!is_valid_pointer(buffer, 1) || !is_valid_pointer(buffer + size, 1)) {
-    // printf("write() b\n");
     return -1;
   }
   int written_size = process_write(fd, buffer, size);
@@ -267,6 +263,7 @@ syscall_handler (struct intr_frame *f)
 {
   if (!is_valid_pointer(f->esp, 4)) {
     kill_program();
+    return;
   }
   int num = *((int *)(f->esp));
 
@@ -274,14 +271,18 @@ syscall_handler (struct intr_frame *f)
     {
       printf("We don't have this System Call!\n");
       kill_program();
+      return;
     }
   if (!syscall_handlers[num])
     {
       printf("this System Call %d not Implement!\n", num);
       kill_program();
+      return;
     }
-  if (syscall_handlers[num](f) == -1) {
+  int status = syscall_handlers[num](f);
+  if (status == -1) {
     kill_program();
+    return;
   }
 }
 

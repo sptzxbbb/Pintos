@@ -416,7 +416,24 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  struct list_elem *e;
+  struct thread *cur = thread_current();
+  for (e = list_begin(&cur->children); e != list_end(&cur->children); e = list_next (e)) {
+    struct thread *t = list_entry (e, struct thread, child_elem);
+    if (t->exited == true) {
+      sema_up (&t->sema_exit);
+    } else {
+      t->parent = NULL;
+      list_remove(&t->child_elem);
+    }
+  }
+
   process_exit ();
+  // remove from its parent's children list
+  if (cur->parent != NULL && cur->parent != initial_thread) {
+    list_remove(&cur->child_elem);
+  }
+
 #endif
 
   /* Remove thread from all threads list, set our status to dying,

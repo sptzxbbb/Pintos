@@ -57,11 +57,15 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
-
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     free(cmd_name);
-    return -1;
+    return TID_ERROR;
+  }
+  struct thread *t = thread_by_tid(tid);
+  sema_down(&t->sema_wait);
+  if (t->ret == RET_STATUS_ERROR) {
+    tid = TID_ERROR;
   }
   return tid;
 }
@@ -84,9 +88,13 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  struct thread *cur = thread_current();
+
   if (!success) {
-    printf("Load failed!\n");
+    cur->ret = RET_STATUS_ERROR;
     thread_exit ();
+  } else {
+    sema_up (&cur->sema_wait);
   }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -113,17 +121,16 @@ process_wait (tid_t child_tid)
   struct thread *cur, *t;
   t= thread_by_tid(child_tid);
   cur = thread_current();
-
   if (!t || t->parent != cur || t->waited) {
     return RET_STATUS_ERROR;
   } else if (t->exited || t->ret != RET_STATUS_INIT) {
+    t->waited = true;
     return t->ret;
   }
 
   sema_down(&t->sema_wait);
   int ret = t->ret;
   sema_up(&t->sema_exit);
-  // why?
   t->waited = true;
   return ret;
 }
@@ -162,9 +169,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-
-
-
 }
 
 /* Sets up the CPU for running user code in the current
@@ -744,5 +748,3 @@ find_child(tid_t child_tid)
     }
   return NULL;
 }
-
-

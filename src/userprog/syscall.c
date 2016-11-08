@@ -91,33 +91,64 @@ syscall_halt (struct intr_frame *f) {
   f->eax = 0;
 }
 
-static void
+static int
 syscall_exit (struct intr_frame *f) {
-  if (!is_user_vaddr(((int *)f->esp) + 2)) {
-    kill_program();
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+      return -1;
   }
-  struct thread *cur = thread_current();
-  cur->ret = *((int *)f->esp + 1);
-  f->eax = 0;
+  int status = *(int *)(f->esp + 4);
+  thread_current()->ret = status;
+  f->eax = status;
   thread_exit();
 }
 
 static pid_t
 syscall_exec (struct intr_frame *f) {
+  if (!is_valid_pointer(f->esp + 4, 4) ||
+      !is_valid_string(*(char **)(f->esp + 4))) {
+    return -1;
+  }
 
+  char *file_name = *(char **)(f->esp + 4);
+  int length = strlen(file_name);
+  if (length >= PGSIZE || length == 0) {
+    return -1;
+  }
+  f->eax = process_execute(file_name);
+  return 0;
 }
+
 static int
 syscall_wait (struct intr_frame *f) {
-
+  if (!is_valid_pointer(f->esp + 4, 4)) {
+    return -1;
+  }
+  pid_t pid = *(int *)(f->esp + 4);
+  f->eax = process_wait(pid);
+  return 0;
 }
-static bool
+
+static int
 syscall_create (struct intr_frame *f) {
-
+  if (!is_valid_pointer(f->esp + 4, 4) ||
+      !is_valid_string(*(char **)(f->esp + 4)) ||
+      !is_valid_pointer(f->esp + 8, 4)) {
+    return -1;
+  }
+  char *file_name = *(char **)(f->esp + 4);
+  unsigned initial_size = *(int *)(f->esp + 8);
+  f->eax = filesys_create(file_name, initial_size);
+  return 0;
 }
 
-static bool
+static int
 syscall_remove (struct intr_frame *f) {
-
+  if (!is_valid_pointer(f->esp + 4, 4) || !(is_valid_string(*(char **)(f->esp + 4)))) {
+    return -1;
+  }
+  char *file_name = *(char **)(f->esp + 4);
+  f->eax = filesys_remove(file_name);
+  return 0;
 }
 
 static int
@@ -177,7 +208,7 @@ syscall_write (struct intr_frame *f) {
   return 0;
 }
 
-static void
+static int
 syscall_seek (struct intr_frame *f) {
   if (!is_valid_pointer(f->esp + 4, 4)) {
     return -1;
@@ -198,7 +229,7 @@ syscall_tell (struct intr_frame *f) {
   return 0;
 }
 
-static void
+static int
 syscall_close (struct intr_frame *f) {
   if (!is_valid_pointer(f->esp + 4, 4)) {
     return -1;
